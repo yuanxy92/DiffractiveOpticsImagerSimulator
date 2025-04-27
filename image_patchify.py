@@ -12,7 +12,6 @@ import glob
 from skimage.io import imread
 from natsort import natsorted
 import re
-import numba
 from torchvision.utils import save_image
 from torchvision.transforms import ToPILImage
 
