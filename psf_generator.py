@@ -16,20 +16,20 @@ from waveoptics.metalens_param import *
 params['padding_dim'] = 1000
 
 device = torch.device('cuda:0')
-duty_filename = './data/240719_Ep0+30_DS2650_BS16_init0_theta28/final_params_best/duty.npy'
-output_dir = './results/in_glass_20240722_f_1150um'
+duty_filename = 'E:/Data/DiffractiveOpticsSimulator/Metalens/1/duty.npy'
+output_dir = './results'
 os.makedirs(output_dir, exist_ok=True)
 
 # set parameter
 aperture_diameter = 0.2e-3
 lambda_base = [606.0, 511.0, 462.0]
 channel_idx = [2, 1, 0]
-theta_base = [0.0, 5.0, 10.0, 15.0, 20.0, 25.0, 30.0]
+theta_base = [0.0, 5.0, 10.0, 15.0, 20.0, 25.0, 30.0, 35.0, 40.0, 45.0]
 phi = 0.0 
 refractive_index = 1.45
 prop_dist = []
 prop_dist.append(1.15e-3)
-crop_size = 601
+crop_size = 301
 crop_size_half = crop_size // 2
 
 # load duty of metalens 
@@ -92,13 +92,16 @@ def compute_and_crop_center_position_w_angle(psf_img, theta, phi, distance, pixe
 
     xc = math.floor(x_center2)
     yc = math.floor(y_center)
-    output_mat_crop = psf_img2[yc - crop_size_half:yc + crop_size_half, xc - crop_size_half:xc + crop_size_half]
+    output_mat_crop = psf_img2[yc - crop_size_half:yc + crop_size_half + 1, xc - crop_size_half:xc + crop_size_half + 1]
 
     return x_center, y_center, output_mat_crop
 
+psf_array = []
+
 for dist in prop_dist:
-    for lambda_idx in range(len(lambda_base)):
-        for theta in theta_base:
+    for theta in theta_base:
+        psf_array_ = np.zeros((crop_size, crop_size, 3), np.uint8)
+        for lambda_idx in range(len(lambda_base)):
             lambda_ = lambda_base[lambda_idx]
             params['lam0'] = lambda_ * params['nanometers']
             prop = AngSpecProp(params['whole_dim'] + 2 * params['padding_dim'], params['pitch'], dist, params['lam0'], refractive_index)
@@ -122,8 +125,10 @@ for dist in prop_dist:
             xc, yc, output_mat_crop = compute_and_crop_center_position_w_angle(output_mat, theta, phi, dist, params['pitch'], refractive_index, crop_size_half)
             output_rgb = np.zeros((output_mat_crop.shape[0], output_mat_crop.shape[1], 3), dtype=np.uint8)
             output_rgb[:, :, channel_idx[lambda_idx]] = output_mat_crop * 255
+            # output_rgb_whole = np.zeros((output_mat.shape[0], output_mat.shape[1], 3), dtype=np.uint8)
+            # output_rgb_whole[:, :, channel_idx[lambda_idx]] = output_mat
+            psf_array_ = psf_array_ + output_rgb
+        psf_array.append(psf_array_)
 
-            output_rgb_whole = np.zeros((output_mat.shape[0], output_mat.shape[1], 3), dtype=np.uint8)
-            output_rgb_whole[:, :, channel_idx[lambda_idx]] = output_mat
-
-            cv2.imwrite(f'{output_dir}/lambda_{lambda_:03.1f}_dist_{dist*1000:01.3f}_theta_{theta:02.1f}_phi_{phi:02.1f}_n_{refractive_index}.png', output_rgb)
+for idx in range(len(psf_array)):
+    cv2.imwrite(f'{output_dir}/theta_{theta_base[idx]:02.0f}.png', psf_array[idx])
