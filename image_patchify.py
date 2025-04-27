@@ -54,8 +54,8 @@ def split_image_into_patches(image, patch_size=(256, 256), stride=128, padding_s
             patches.append(patch)
             masks.append(blending_mask)
             # Position relative to the original (non-padded) image
-            orig_x = x - padding_size + patch_size[0] // 2
-            orig_y = y - padding_size + patch_size[0] // 2
+            orig_x = x - padding_size + patch_size[0] // 2 - padding_size
+            orig_y = y - padding_size + patch_size[0] // 2 - padding_size
             positions.append((orig_x, orig_y))
 
     return patches, masks, positions
