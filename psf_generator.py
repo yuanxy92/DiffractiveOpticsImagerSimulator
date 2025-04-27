@@ -76,7 +76,8 @@ def generate_psfs(metalens_param):
     crop_size = metalens_param["crop_size"]
     crop_size_half = crop_size // 2
     prop_dist = []
-    prop_dist.append(metalens_param["focal_length"])
+    prop_dist.append(metalens_param["prop_length"])
+    phi = 0.0
 
     # load duty of metalens 
     duty = np.load(duty_filename)

@@ -1,5 +1,6 @@
 import torch
 import cv2
+import os
 import numpy as np
 import matplotlib.pyplot as plt
 from pathlib import Path
@@ -11,16 +12,16 @@ from psf_generator import generate_psfs
 
 metalens_param = {
 'aperture_diameter' : 0.2e-3,
-'lambda_base' : [606.0, 511.0, 462.0],
+'lambda_base' : [630.0, 540.0, 460.0],
 'channel_idx' : [2, 1, 0],
 'theta_base' : [0.0, 5.0, 10.0, 15.0, 20.0, 25.0, 30.0, 35.0, 40.0, 45.0],
 'prop_length' : 1.15e-3,
 'refractive_index' : 1.45,
-'crop_size' : 301,
-'duty_filename' : 'E:/Data/DiffractiveOpticsSimulator/Metalens/1/duty.npy',
+'crop_size' : 201,
+'duty_filename' : './data/duty.npy',
 'psf_pixel_size': 350e-9,
 'image_pixel_size': 1.75e-6,
-
+'visualze': False
 }
 
 def convert_position_to_angle_rotation(positions, image_size, pixel_size, flocal_length):
@@ -110,69 +111,83 @@ def resize_and_rotate_psf(psf, psf_pixel_size, image_pixel_size, angle_degrees):
     scale = psf_pixel_size / image_pixel_size
     new_size = (int(rotated_psf.shape[1] * scale), int(rotated_psf.shape[0] * scale))
     resized_psf = cv2.resize(rotated_psf, new_size, interpolation=cv2.INTER_CUBIC)
-    return resized_psf
+
+    normalized_psf = resized_psf.astype(np.float32)
+    for c in range(3):
+        normalized_psf[:, :, c] = normalized_psf[:, :, c] / np.sum(normalized_psf[:, :, c])
+    return normalized_psf
 
 if __name__ == "__main__":
     print('Start simulator ...')
     output_dir = './results'
-    # read images
-    img = cv2.imread('./data/div_000005.png')  # Replace with your image path
-    img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
-    image_size = [512, 512]
-    img = cv2.resize(img, image_size)
+    os.makedirs(output_dir, exist_ok=True)
+    os.makedirs(os.path.join(output_dir, 'psf'), exist_ok=True)
+    image_names = ['div_000000', 'div_000002', 'div_000005', 'div_000015', 'div_000044']
 
-    # Parameters
-    patch_size = [256] * 2
-    stride = patch_size[0] // 2
-    padding_size = 32   # independent padding size
-    blending_pad = patch_size[0] // 2   # blending area size
-    patches, masks, positions = split_image_into_patches(img, patch_size, stride, padding_size, blending_pad)
-    print(f"Number of patches: {len(patches)}")
-    print(f"First patch position (relative to original image): {positions[0]}")
-    print(f"Patch size: {patches[0].shape}, Mask size: {masks[0].shape}")
+    for img_idx in range(len(image_names)):
+        # read images
+        imagename = f'./data/{image_names[img_idx]}.png'
+        print(f'Process {imagename} ...')
+        img = cv2.imread(imagename)  # Replace with your image path
+        img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
+        image_size = [512, 512]
+        img = cv2.resize(img, image_size)
 
-    # Compute patch positions and psf angle and rotations
-    distances, angles, theta_angles = convert_position_to_angle_rotation(positions, image_size, 
-                                                                        metalens_param['image_pixel_size'], 
-                                                                        metalens_param['prop_length']/metalens_param['refractive_index'])
-    print('Patch distance to center (px):', distances)
-    print('Rotation for psf (px):', angles)
-    print('Theta for psf simulation:', theta_angles)
+        # Parameters
+        patch_size = [128] * 2
+        stride = patch_size[0] // 2
+        padding_size = 16   # independent padding size
+        blending_pad = patch_size[0] // 2   # blending area size
+        patches, masks, positions = split_image_into_patches(img, patch_size, stride, padding_size, blending_pad)
+        if metalens_param['visualze'] == True:
+            print(f"Number of patches: {len(patches)}")
+            print(f"First patch position (relative to original image): {positions[0]}")
+            print(f"Patch size: {patches[0].shape}, Mask size: {masks[0].shape}")
 
-    theta_angles_sorted, theta_indices = map_to_sorted_unique_indices(theta_angles)
-    print('Theta induces:', theta_indices)
-    print('Theta values sorted:', theta_angles_sorted)
+        # Compute patch positions and psf angle and rotations
+        if img_idx == 0:
+            distances, angles, theta_angles = convert_position_to_angle_rotation(positions, image_size, 
+                                                                                metalens_param['image_pixel_size'], 
+                                                                                metalens_param['prop_length']/metalens_param['refractive_index'])
+            print('Patch distance to center (px):', distances)
+            print('Rotation for psf (px):', angles)
+            print('Theta for psf simulation:', theta_angles)
+            theta_angles_sorted, theta_indices = map_to_sorted_unique_indices(theta_angles)
+            print('Theta induces:', theta_indices)
+            print('Theta values sorted:', theta_angles_sorted)
+            # generate psfs
+            metalens_param['theta_base'] = theta_angles_sorted
+            psf_array = generate_psfs(metalens_param)
+            for idx in range(len(psf_array)):
+                cv2.imwrite(f'{output_dir}/psf/theta_{idx}.png', psf_array[idx])
+        
+        # applying psfs
+        filtered_patches = []
+        for idx in range(len(patches)):
+            patch = patches[idx]
+            angle = angles[idx]
+            psf_idx = theta_indices[idx]
+            psf = psf_array[psf_idx]
+            # rotate and resize psf
+            psf_aligned = resize_and_rotate_psf(psf, metalens_param['psf_pixel_size'], 
+                                            metalens_param['image_pixel_size'], 
+                                            angle)
+            # apply image filter
+            # print('Pos: ', positions[idx], 'psf idx: ', psf_idx)
+            filtered_patch = np.zeros_like(patch)
+            for c in range(3):  # For each channel (R, G, B)
+                filtered_patch[:, :, c] = cv2.filter2D(patch[:, :, c], -1, psf_aligned[:, :, 2 - c])
+            filtered_patches.append(filtered_patch)
 
-    # generate psfs
-    metalens_param['theta_base'] = theta_angles_sorted
-    psf_array = generate_psfs(metalens_param)
-    for idx in range(len(psf_array)):
-        cv2.imwrite(f'{output_dir}/theta_{idx}.png', psf_array[idx])
-    
-    # applying psfs
-    filtered_patches = []
-    for idx in range(len(patches)):
-        patch = patches[idx]
-        angle = angles[idx]
-        psf_idx = theta_indices[idx]
-        psf = psf_array[psf_idx]
-        # rotate and resize psf
-        psf_aligned = resize_and_rotate_psf(psf, metalens_param['psf_pixel_size'], 
-                                        metalens_param['image_pixel_size'], 
-                                        angle)
-        # apply image filter
-        filtered_patch = np.zeros_like(patch)
-        for c in range(3):  # For each channel (R, G, B)
-            filtered_patch[:, :, c] = cv2.filter2D(patch[:, :, c], -1, psf_aligned[:, :, 2 - c])
-        filtered_patches.append(filtered_patch)
+        merged_image = merge_patches(filtered_patches, masks, positions, image_size, patch_size, padding_size)
+        cv2.imwrite(f'{output_dir}/{image_names[img_idx]}.png', cv2.cvtColor(merged_image, cv2.COLOR_RGB2BGR))
 
-    merged_image = merge_patches(filtered_patches, masks, positions, image_size, patch_size, padding_size)
-
-    # Visualization
-    visualize_patches(img, patches, masks, positions, patch_size, stride, padding_size)
-    # (Optional) show a blending mask separately
-    plt.figure(figsize=(4, 4))
-    plt.imshow(merged_image)
-    plt.title('Merged image')
-    plt.show()
+        if metalens_param['visualze'] == True:
+            # Visualization
+            visualize_patches(img, patches, masks, positions, patch_size, stride, padding_size)
+            # (Optional) show a blending mask separately
+            plt.figure(figsize=(4, 4))
+            plt.imshow(merged_image)
+            plt.title('Merged image')
+            plt.show()
 
