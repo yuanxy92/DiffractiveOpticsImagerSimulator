@@ -20,7 +20,8 @@ metalens_param = {
 'duty_filename' : 'E:/Data/DiffractiveOpticsSimulator/Metalens/1/duty.npy'
 }
 
-if __name__ == "main":
+if __name__ == "__main__":
+    print('Start simulator ...')
     output_dir = './results'
     # read images
     img = cv2.imread('./data/div_000005.png')  # Replace with your image path
