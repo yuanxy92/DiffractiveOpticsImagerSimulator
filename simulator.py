@@ -45,6 +45,40 @@ metalens_param = {
 'visualze': False
 }
 
+def generate_dot_background(image_size=(512, 512), array_size=(10, 10), dot_radius=5, save_path=None):
+    """
+    Generate a black background with white dots.
+
+    Parameters:
+    - image_size: (width, height) of the image in pixels
+    - array_size: (columns, rows) number of dots
+    - dot_radius: radius of each white dot in pixels
+    - save_path: if provided, save the image to this path
+
+    Returns:
+    - img: generated image as a numpy array
+    """
+    width, height = image_size
+    cols, rows = array_size
+
+    # Create a black image
+    img = np.zeros((height, width, 3), dtype=np.uint8)
+
+    # Compute spacing
+    x_spacing = width // (cols + 1)
+    y_spacing = height // (rows + 1)
+
+    # Draw white dots
+    for i in range(1, cols + 1):
+        for j in range(1, rows + 1):
+            center = (i * x_spacing, j * y_spacing)
+            cv2.circle(img, center, dot_radius, (255, 255, 255), thickness=-1)
+
+    if save_path:
+        cv2.imwrite(save_path, img)
+
+    return img
+
 def convert_position_to_angle_rotation(positions, image_size, pixel_size, flocal_length):
     """
     Compute distance and angle from each patch center to the image center.
@@ -143,7 +177,8 @@ if __name__ == "__main__":
     output_dir = './results'
     os.makedirs(output_dir, exist_ok=True)
     os.makedirs(os.path.join(output_dir, 'psf'), exist_ok=True)
-    image_names = ['div_000000', 'div_000002', 'div_000005', 'div_000006', 'div_000015', 'div_000044']
+    generate_dot_background(image_size=(metalens_param['image_size'], metalens_param['image_size']), array_size=(9, 9), dot_radius=5, save_path='./data/div_0.png')
+    image_names = ['div_0', 'div_000000', 'div_000002', 'div_000005', 'div_000006', 'div_000015', 'div_000044']
 
     for img_idx in range(len(image_names)):
         # read images
