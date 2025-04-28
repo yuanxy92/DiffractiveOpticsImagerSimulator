@@ -24,6 +24,7 @@ from psf_generator import generate_psfs
 # #
 # 'patch_size': 128,
 # 'padding_size': 16,
+# 'image_size': 512,
 # 'visualze': False
 # }
 
@@ -154,7 +155,7 @@ def resize_and_rotate_psf(psf, psf_pixel_size, image_pixel_size, angle_degrees):
     """
     # Step 1: Rotate PSF first while keeping the center fixed
     center = (psf.shape[1] / 2.0, psf.shape[0] / 2.0)
-    rotation_matrix = cv2.getRotationMatrix2D(center, angle_degrees, 1.0)
+    rotation_matrix = cv2.getRotationMatrix2D(center, -angle_degrees, 1.0)
     rotated_psf = cv2.warpAffine(
         psf, 
         rotation_matrix, 
@@ -177,7 +178,8 @@ if __name__ == "__main__":
     output_dir = './results'
     os.makedirs(output_dir, exist_ok=True)
     os.makedirs(os.path.join(output_dir, 'psf'), exist_ok=True)
-    generate_dot_background(image_size=(metalens_param['image_size'], metalens_param['image_size']), array_size=(9, 9), dot_radius=5, save_path='./data/div_0.png')
+    generate_dot_background(image_size=(metalens_param['image_size'], metalens_param['image_size']), 
+                            array_size=(9, 9), dot_radius=3, save_path='./data/div_0.png')
     image_names = ['div_0', 'div_000000', 'div_000002', 'div_000005', 'div_000006', 'div_000015', 'div_000044']
 
     for img_idx in range(len(image_names)):
