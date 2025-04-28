@@ -80,7 +80,7 @@ def generate_psfs(metalens_param):
     phi = 0.0
 
     # load duty of metalens 
-    duty = np.load(duty_filename)
+    duty = np.load(metalens_param['duty_filename'])
     duty = np.clip(duty, 0.3, 0.82)
     padding_values = ((0, 0), (0, 0))
     padding_size_duty_ = (2285 - duty.shape[0]) // 2
