@@ -58,8 +58,8 @@ def generate_phase_wavefront(nx, ny, wavelength, angle_x, angle_y, pixel_pitch):
         The phase wavefront.
     """
     # Convert angle to radians
-    angle_x = np.radians(angle_x)
-    angle_y = np.radians(angle_y)
+    angle_x = -np.radians(angle_x)
+    angle_y = -np.radians(angle_y)
     # Create a grid of points with physical spacing
     x = np.linspace(0, (nx-1)*pixel_pitch, nx)
     y = np.linspace(0, (ny-1)*pixel_pitch, ny)

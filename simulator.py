@@ -9,42 +9,45 @@ from skimage import io
 
 from image_patchify import *
 from psf_generator import generate_psfs
-
-# metalens_param = {
-# 'aperture_diameter' : 0.2e-3,
-# 'lambda_base' : [630.0, 540.0, 460.0],
-# 'channel_idx' : [2, 1, 0],
-# 'theta_base' : [0.0, 5.0, 10.0, 15.0, 20.0, 25.0, 30.0, 35.0, 40.0, 45.0],
-# 'prop_length' : 1.15e-3,
-# 'refractive_index' : 1.45,
-# 'crop_size' : 201,
-# 'duty_filename' : './data/duty.npy',
-# 'psf_pixel_size': 350e-9,
-# 'image_pixel_size': 1.75e-6,
-# #
-# 'patch_size': 128,
-# 'padding_size': 16,
-# 'image_size': 512,
-# 'visualze': False
-# }
+import sys
 
 metalens_param = {
-'aperture_diameter' : 0.7e-3,
+'aperture_diameter' : 0.2e-3,
 'lambda_base' : [630.0, 540.0, 460.0],
 'channel_idx' : [2, 1, 0],
 'theta_base' : [0.0, 5.0, 10.0, 15.0, 20.0, 25.0, 30.0, 35.0, 40.0, 45.0],
-'prop_length' : 3e-3,
-'refractive_index' : 1,
-'crop_size' : 401,
-'duty_filename' : './data/duty_3mm.npy',
+'prop_length' : 1.15e-3,
+'refractive_index' : 1.45,
+'crop_size' : 201,
+'duty_filename' : './data/duty.npy',
 'psf_pixel_size': 350e-9,
-'image_pixel_size': 2.5e-6,
+'image_pixel_size': 1.333333e-6,
+# 'image_pixel_size': 1.333333e-6,
 #
-'patch_size': 200,
-'padding_size': 32,
-'image_size': 800,
+'patch_size': 105,
+'stride': 35,
+'padding_size': 0,
+'image_size': 525,
 'visualze': False
 }
+
+# metalens_param = {
+# 'aperture_diameter' : 0.7e-3,
+# 'lambda_base' : [630.0, 540.0, 460.0],
+# 'channel_idx' : [2, 1, 0],
+# 'theta_base' : [0.0, 5.0, 10.0, 15.0, 20.0, 25.0, 30.0, 35.0, 40.0, 45.0],
+# 'prop_length' : 3e-3,
+# 'refractive_index' : 1,
+# 'crop_size' : 401,
+# 'duty_filename' : './data/duty_3mm.npy',
+# 'psf_pixel_size': 350e-9,
+# 'image_pixel_size': 2.5e-6,
+# #
+# 'patch_size': 200,
+# 'padding_size': 32,
+# 'image_size': 800,
+# 'visualze': False
+# }
 
 def generate_dot_background(image_size=(512, 512), array_size=(10, 10), dot_radius=5, save_path=None):
     """
@@ -175,25 +178,38 @@ def resize_and_rotate_psf(psf, psf_pixel_size, image_pixel_size, angle_degrees):
 
 if __name__ == "__main__":
     print('Start simulator ...')
-    output_dir = './results'
+    # output_dir = sys.argv[2]
+    # input_dir = sys.argv[1]
+    output_dir = 'data'
+    input_dir = 'circles'
     os.makedirs(output_dir, exist_ok=True)
     os.makedirs(os.path.join(output_dir, 'psf'), exist_ok=True)
     generate_dot_background(image_size=(metalens_param['image_size'], metalens_param['image_size']), 
                             array_size=(9, 9), dot_radius=3, save_path='./data/div_0.png')
-    image_names = ['div_0', 'div_000000', 'div_000002', 'div_000005', 'div_000006', 'div_000015', 'div_000044']
+    image_names = os.listdir(input_dir)
 
     for img_idx in range(len(image_names)):
         # read images
-        imagename = f'./data/{image_names[img_idx]}.png'
+        imagename = os.path.join(input_dir,image_names[img_idx])
         print(f'Process {imagename} ...')
         img = cv2.imread(imagename)  # Replace with your image path
         img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
         image_size = [metalens_param['image_size'], metalens_param['image_size']]
-        img = cv2.resize(img, image_size)
+        
+        h, w, _ = img.shape
+
+        # 计算中心裁剪
+        min_edge = min(h, w)
+        top = (h - min_edge) // 2
+        left = (w - min_edge) // 2
+        img_cropped = img[top:top+min_edge, left:left+min_edge]
+
+    
+        img = cv2.resize(img_cropped, image_size)
 
         # Parameters
         patch_size = [metalens_param['patch_size']] * 2
-        stride = patch_size[0] // 2
+        stride = metalens_param['stride']
         padding_size = metalens_param['padding_size']   # independent padding size
         blending_pad = patch_size[0] // 2   # blending area size
         patches, masks, positions = split_image_into_patches(img, patch_size, stride, padding_size, blending_pad)
@@ -216,8 +232,8 @@ if __name__ == "__main__":
             # generate psfs
             metalens_param['theta_base'] = theta_angles_sorted
             psf_array = generate_psfs(metalens_param)
-            for idx in range(len(psf_array)):
-                cv2.imwrite(f'{output_dir}/psf/theta_{idx}.png', psf_array[idx])
+            # for idx in range(len(psf_array)):
+            #     cv2.imwrite(f'{output_dir}/psf/theta_{idx}.png', psf_array[idx])
         
         # applying psfs
         filtered_patches = []
@@ -227,6 +243,7 @@ if __name__ == "__main__":
             psf_idx = theta_indices[idx]
             psf = psf_array[psf_idx]
             # rotate and resize psf
+            # psf2 = cv2.flip(psf, 1)
             psf_aligned = resize_and_rotate_psf(psf, metalens_param['psf_pixel_size'], 
                                             metalens_param['image_pixel_size'], 
                                             angle)
@@ -238,7 +255,7 @@ if __name__ == "__main__":
             filtered_patches.append(filtered_patch)
 
         merged_image = merge_patches(filtered_patches, masks, positions, image_size, patch_size, padding_size)
-        cv2.imwrite(f'{output_dir}/{image_names[img_idx]}.png', cv2.cvtColor(merged_image, cv2.COLOR_RGB2BGR))
+        cv2.imwrite(os.path.join(output_dir,image_names[img_idx]), cv2.cvtColor(merged_image, cv2.COLOR_RGB2BGR))
 
         if metalens_param['visualze'] == True:
             # Visualization

@@ -39,8 +39,8 @@ def compute_and_crop_center_position(psf_img):
 
 def compute_and_crop_center_position_w_angle(psf_img, theta, phi, distance, pixel_size, rindex, crop_half_size):
     psf_img = psf_img / np.max(psf_img)
-    theta_out = math.asin(1 / rindex * math.sin(math.radians(theta)))
-    phi_out = math.asin(1 / rindex * math.sin(math.radians(phi)))
+    theta_out = math.asin(1 / rindex * math.sin(-math.radians(theta)))
+    phi_out = math.asin(1 / rindex * math.sin(-math.radians(phi)))
     # compute pixel shift
     pixel_shift_theta = distance * math.tan(theta_out) / pixel_size
     pixel_shift_phi = distance * math.tan(phi_out) / pixel_size
@@ -123,6 +123,8 @@ def generate_psfs(metalens_param):
                 output_mat = output_mat / np.max(output_mat) * 255
                 output_mat = output_mat.astype(np.uint8)
                 # compute center
+                if theta > 24:
+                    a = 1
                 xc, yc, output_mat_crop = compute_and_crop_center_position_w_angle(output_mat, theta, phi, dist, params['pitch'], refractive_index, crop_size_half)
                 output_rgb = np.zeros((output_mat_crop.shape[0], output_mat_crop.shape[1], 3), dtype=np.uint8)
                 output_rgb[:, :, channel_idx[lambda_idx]] = output_mat_crop * 255
