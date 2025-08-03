@@ -43,11 +43,29 @@ metalens_param = {
 # 'psf_pixel_size': 350e-9,
 # 'image_pixel_size': 2.5e-6,
 # #
-# 'patch_size': 200,
-# 'padding_size': 32,
-# 'image_size': 800,
+# 'patch_size': 128,
+# 'padding_size': 16,
+# 'image_size': 512,
 # 'visualze': False
 # }
+
+metalens_param = {
+'aperture_diameter' : 0.7e-3,
+'lambda_base' : [630.0, 540.0, 460.0],
+'channel_idx' : [2, 1, 0],
+'theta_base' : [0.0, 5.0, 10.0, 15.0, 20.0, 25.0, 30.0, 35.0, 40.0, 45.0],
+'prop_length' : 3e-3,
+'refractive_index' : 1,
+'crop_size' : 401,
+'duty_filename' : './data/duty_3mm.npy',
+'psf_pixel_size': 350e-9,
+'image_pixel_size': 2.5e-6,
+#
+'patch_size': 200,
+'padding_size': 32,
+'image_size': 800,
+'visualze': False
+}
 
 def generate_dot_background(image_size=(512, 512), array_size=(10, 10), dot_radius=5, save_path=None):
     """
@@ -186,11 +204,11 @@ if __name__ == "__main__":
     os.makedirs(os.path.join(output_dir, 'psf'), exist_ok=True)
     generate_dot_background(image_size=(metalens_param['image_size'], metalens_param['image_size']), 
                             array_size=(9, 9), dot_radius=3, save_path='./data/div_0.png')
-    image_names = os.listdir(input_dir)
+    image_names = ['div_0', 'div_000000', 'div_000002', 'div_000005', 'div_000006', 'div_000015', 'div_000044']
 
     for img_idx in range(len(image_names)):
         # read images
-        imagename = os.path.join(input_dir,image_names[img_idx])
+        imagename = f'./data/{image_names[img_idx]}.png'
         print(f'Process {imagename} ...')
         img = cv2.imread(imagename)  # Replace with your image path
         img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
